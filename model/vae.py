@@ -1,27 +1,27 @@
-import torch.nn as nn
+from torch import nn
 import networks
 
 
 class VAE(nn.Module):
-    def __init__(self, z_dim, insize, d, nh, h, binfeats, contfeats, activation, cuda=False):
+    def __init__(self, binary_features, continuous_features, z_dim, hidden_dim, hidden_layers, activation, cuda):
         super(VAE, self).__init__()
         self.encoder = networks.Encoder(
-            in_size, in_size+1, d, nh, h, binfeats, contfeats, activation)
+            binary_features, continuous_features, z_dim, hidden_dim, hidden_layers, activation)
         self.decoder = networks.Decoder(
-            d, nh, h, binfeats, contfeats, activation)
+            binary_features, continuous_features, z_dim, hidden_dim, hidden_layers, activation)
 
         if cuda:
             self.cuda()
         self.cuda = cuda
         self.z_dim = z_dim
-        self.binfeats = binfeats
-        self.contfeats = contfeats
+        self.binary = binary_features
+        self.continuous = continuous_features
 
     def model(self, data):
         pyro.module("decoder", self.decoder)
-        binary_x_observation = data[:, :self.binfeats]
+        binary_x_observation = data[:, :self.binary]
         continuous_x_observation = data[:,
-                                        self.binfeats:self.binfeats+self.contfeats]
+                                        self.binary:self.binary+self.continuous]
         t_observation = data[:, -2]
         y_observation = data[:, -1]
         with pyro.plate("data", data.shape[0]):
@@ -49,7 +49,7 @@ class VAE(nn.Module):
 
     def guide(self, data):
         pyro.module("encoder", self.encoder)
-        x_observation = data[:, :self.binfeats + self.contfeats]
+        x_observation = data[:, :self.binary + self.continuous]
         with pyro.plate("data", data.shape[0]):
             # Q(t|x)
             logits_t = self.encoder.forward_Q_t(x_observation):

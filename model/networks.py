@@ -1,37 +1,37 @@
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 
 
 class FCNet(nn.Module):
-    def __init__(self, in_size, layers, out_layers, activation):
+    def __init__(self, input_size, layers, out_layers, activation):
         super(FCNet, self).__init__()
 
         self.activation = activation
 
            if layers:
-                self.input = nn.Linear(in_size, layers[0])
+                self.input = nn.Linear(input_size, layers[0])
                 self.hidden_layers = nn.ModuleList()
                 for i in range(1, len(layers)):
                     self.hidden_layers.append(nn.Linear(layers[i], layers[i]))
                 self.output_layers = nn.ModuleList()
                 self.output_activations = []
-                for i, (outdim, activation) in enumerate(out_layers):
+                for i, (outdim, self.activation) in enumerate(out_layers):
                     self.output_layers.append(nn.Linear(layers[-1], outdim))
-                    self.output_activations.append(activation)
+                    self.output_activations.append(self.activation)
             else:
                 self.output_layers = nn.ModuleList()
                 self.output_activations = []
-                for i, (outdim, activation) in enumerate(out_layers):
-                    self.output_layers.append(nn.Linear(in_size, outdim))
-                    self.output_activations.append(activation)
+                for i, (outdim, self.activation) in enumerate(out_layers):
+                    self.output_layers.append(nn.Linear(input_size, outdim))
+                    self.output_activations.append(self.activation)
 
         def forward(self, x):
 
-            x = self.activation(self.input(x) )
+            x = self.activation(self.input(x))
             try:
                 for layer in self.hidden_layers:
-                    x = self.activation(layer(x) )
+                    x = self.activation(layer(x))
             except AttributeError:
                 pass
             if self.output_layers:
@@ -47,21 +47,21 @@ class FCNet(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, n_z, nh, h, binfeats, contfeats, activation):
+    def __init__(self, binfeats, contfeats, n_z, h, nh, activation):
         super(Decoder, self).__init__()
 
 		# p(x|z)
-		self.hx = FCNet(n_z, (nh - 1) * [h], [], activation=activation)
-		self.logits_1 = FCNet(h, [h], [[binfeats, F.sigmoid]], activation=activation)
+		self.hx = FCNet(n_z, (nh - 1) * [h], [], activation)
+		self.logits_1 = FCNet(h, [h], [[binfeats, F.sigmoid]], activation)
 
-		self.mu_sigma = FCNet(h, [h], [[contfeats, None], [contfeats, F.softplus]], activation=activation)
+		self.mu_sigma = FCNet(h, [h], [[contfeats, None], [contfeats, F.softplus]], activation)
 
 		# p(t|z)
-		self.logits_2 = FCNet(n_z, [h], [[1, F.sigmoid]], activation=activation)
+		self.logits_2 = FCNet(n_z, [h], [[1, F.sigmoid]], activation)
 
 		# p(y|t,z)
-		self.mu2_t0 = FCNet(n_z, nh * [h], [[1, None]], activation=activation)
-		self.mu2_t1 = FCNet(n_z, nh * [h], [[1, None]], activation=activation)
+		self.mu2_t0 = FCNet(n_z, nh * [h], [[1, None]], activation)
+		self.mu2_t1 = FCNet(n_z, nh * [h], [[1, None]], activation)
 
     def forward_P_x(self, z, cont=False):
 		# p(x|z)
@@ -105,21 +105,24 @@ class Decoder(nn.Module):
 		return y
 
 class Encoder(nn.Module):
-    def __init__(self, in_size, in2_size, d, nh, h, binfeats, contfeats, activation):
+    def __init__(self, binfeats, contfeats, d, h, nh, activation):
         super(Encoder, self).__init__()
 
+        in_size = binfeats + contfeats
+        in2_size = in_size + 1
+
 		# q(t|x)
-		self.logits_t = FCNet(in_size, [d], [[1, F.sigmoid]], activation=activation)
+		self.logits_t = FCNet(in_size, [d], [[1, F.sigmoid]], activation)
 
 		# q(y|x,t)
-		self.hqy = FCNet(in_size, (nh - 1) * [h], [], activation=activation)
-		self.mu_qy_t0 = FCNet(h, [h], [[1, None]], activation=activation)
-		self.mu_qy_t1 = FCNet(h, [h], [[1, None]], activation=activation)
+		self.hqy = FCNet(in_size, (nh - 1) * [h], [], activation)
+		self.mu_qy_t0 = FCNet(h, [h], [[1, None]], activation)
+		self.mu_qy_t1 = FCNet(h, [h], [[1, None]], activation)
 
 		# q(z|x,t,y)
-		self.hqz = FCNet(in2_size, (nh - 1) * [h], [], activation=activation)
-		self.muq_t0_sigmaq_t0 = FCNet(h, [h], [[d, None], [d, F.softplus]], activation=activation)
-		self.muq_t1_sigmaq_t1 = FCNet(h, [h], [[d, None], [d, F.softplus]], activation=activation)
+		self.hqz = FCNet(in2_size, (nh - 1) * [h], [], activation)
+		self.muq_t0_sigmaq_t0 = FCNet(h, [h], [[d, None], [d, F.softplus]], activation)
+		self.muq_t1_sigmaq_t1 = FCNet(h, [h], [[d, None], [d, F.softplus]], activation)
         
     def forward_Q_t(self, x):
 		# q(t|x)
