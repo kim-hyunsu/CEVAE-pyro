@@ -1,12 +1,13 @@
-import models
+import torch.nn as nn
+import networks
 
 
 class VAE(nn.Module):
     def __init__(self, z_dim, insize, d, nh, h, binfeats, contfeats, activation, cuda=False):
         super(VAE, self).__init__()
-        self.encoder = models.Encoder(
+        self.encoder = networks.Encoder(
             in_size, in_size+1, d, nh, h, binfeats, contfeats, activation)
-        self.decoder = models.Decoder(
+        self.decoder = networks.Decoder(
             d, nh, h, binfeats, contfeats, activation)
 
         if cuda:
