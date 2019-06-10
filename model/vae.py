@@ -1,5 +1,5 @@
 from torch import nn
-import networks
+from . import networks
 
 
 class VAE(nn.Module):
