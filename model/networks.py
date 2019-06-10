@@ -26,29 +26,30 @@ class FCNet(nn.Module):
                     self.output_layers.append(nn.Linear(input_size, outdim))
                     self.output_activations.append(self.activation)
 
-        def forward(self, x):
+    def forward(self, x):
 
-            x = self.activation(self.input(x))
-            try:
-                for layer in self.hidden_layers:
-                    x = self.activation(layer(x))
-            except AttributeError:
-                pass
-            if self.output_layers:
-                outputs = []
-                for output_layer, output_activation in zip(self.output_layers, self.output_activations):
-                    if output_activation:
-                        outputs.append(output_activation( output_layer(x) ) )
-                    else:
-                        outputs.append(output_layer(x) )
-                return outputs if len(outputs) > 1 else outputs[0]
-            else:
-                return x
+        x = self.activation(self.input(x))
+        try:
+            for layer in self.hidden_layers:
+                x = self.activation(layer(x))
+        except AttributeError:
+            pass
+        if self.output_layers:
+            outputs = []
+            for output_layer, output_activation in zip(self.output_layers, self.output_activations):
+                if output_activation:
+                    outputs.append(output_activation( output_layer(x) ) )
+                else:
+                    outputs.append(output_layer(x) )
+            return outputs if len(outputs) > 1 else outputs[0]
+        else:
+            return x
 
 
 class Decoder(nn.Module):
-    def __init__(self, binfeats, contfeats, n_z, h, nh, activation):
+    def __init__(self, binfeats, contfeats, n_z, h, nh, activation, cuda):
         super(Decoder, self).__init__()
+        self.cuda = cuda
 
 		# p(x|z)
 		self.hx = FCNet(n_z, (nh - 1) * [h], [], activation)
@@ -63,31 +64,23 @@ class Decoder(nn.Module):
 		self.mu2_t0 = FCNet(n_z, nh * [h], [[1, None]], activation)
 		self.mu2_t1 = FCNet(n_z, nh * [h], [[1, None]], activation)
 
-    def forward_P_x(self, z, cont=False):
+    def forward(self, z):
 		# p(x|z)
-
 		hx = self.hx.forward(z)
+        x_logits = self.logits_1.forward(hx)
+        x_loc, x_scale = self.mu_sigma.forward(hx)
 
-        if not cont:
-            logits = self.logits_1.forward(hx)
-            return logits
-        else:
-            mu, sigma = self.mu_sigma.forward(hx)
-            return mu, sigma
+        # p(t|z)
+		t_logits = self.logits_2(z)
 
-    def forward_P_t(self, z):
-		# p(t|z)
-		logits = self.logits_2(z)
-        return logits
-
-    def forward_P_y(self, z, t):
 		# p(y|t,z)
-		mu2_t0 = self.mu2_t0(z)
-		mu2_t1 = self.mu2_t1(z)
-        mu2 = t * mu2_t1 + (1. - t) * mu2_t0
-		sig = Variable(torch.ones(mu2_t0.size()))
+        y_loc_t0 = self.mu2_t0(z)
+		y_loc_t1 = self.mu2_t1(z)
+		y_scale = Variable(torch.ones(mu2_t0.size()))
+        if self.cuda:
+            y_scale = y_scale.cuda()
 
-        return mu2, sig
+        return (x_logits, x_loc, x_scale), (t_logits), (y_loc_t0, y_loc_t1, y_scale)
 
     def P_y_zt(self, z, t):
 		# p(y|t,z)
@@ -105,9 +98,9 @@ class Decoder(nn.Module):
 		return y
 
 class Encoder(nn.Module):
-    def __init__(self, binfeats, contfeats, d, h, nh, activation):
+    def __init__(self, binfeats, contfeats, d, h, nh, activation, cuda):
         super(Encoder, self).__init__()
-
+        self.cuda = cuda
         in_size = binfeats + contfeats
         in2_size = in_size + 1
 
@@ -124,33 +117,26 @@ class Encoder(nn.Module):
 		self.muq_t0_sigmaq_t0 = FCNet(h, [h], [[d, None], [d, F.softplus]], activation)
 		self.muq_t1_sigmaq_t1 = FCNet(h, [h], [[d, None], [d, F.softplus]], activation)
         
-    def forward_Q_t(self, x):
+    def forward(self, x):
 		# q(t|x)
-		logits_t = self.logits_t.forward(x)
-        
-        return logits_t
+		t_logits = self.logits_t.forward(x)
+        t = sample('t', dist.Bernoulli(t_logtis).to_event(1))
 
-    def forward_Q_y(self, x, t):
 		# q(y|x,t)
 		hqy = self.hqy.forward(x)
+		y_loc_t0 = self.mu_qy_t0.forward(hqy)
+		y_loc_t1 = self.mu_qy_t1.forward(hqy)
+        y_loc = t * y_loc_t1 + (1. - t) * y_loc_t0
+		y_scale = Variable(torch.ones(y_loc_t0.size()))
+        if self.cuda:
+            y_scale = y_scale.cuda()
+        y = sample('y', dist.Normal(y_loc, y_scale))
 
-		mu_qy_t0 = self.mu_qy_t0.forward(hqy)
-		mu_qy_t1 = self.mu_qy_t1.forward(hqy)
-
-        mu_qy = t * mu_qy_t1 + (1. - t) * mu_qy_t0
-
-		sig = Variable(torch.ones(mu_qy_t0.size()))
-
-        return mu_qy, sig
-
-    def forward_Q_z(self, x, y, t):
-		# q(z|x,t,y)
+        # q(z|x,t,y)
 		hqz = self.hqz.forward(torch.cat((x, y), 1))
+		z_loc_t0, z_scale_t0 = self.muq_t0_sigmaq_t0.forward(hqz)
+		z_loc_t1, z_scale_t0 = self.muq_t1_sigmaq_t1.forward(hqz)
+        z_loc = t * z_loc_t1 + (1. - t) * z_loc_t0
+        z_scale = t * z_scale_t1 + (1. - t) * z_scale_t0
 
-		muq_t0, sigmaq_t0 = self.muq_t0_sigmaq_t0.forward(hqz)
-		muq_t1, sigmaq_t1 = self.muq_t1_sigmaq_t1.forward(hqz)
-
-        muq = t * muq_t1 + (1. - t) * muq_t0
-        sigmaq = t * sigmaq_t1 + (1. - t) * sigmaq_t0
-
-		return muq, sigmaq
+        return z_loc, z_scale

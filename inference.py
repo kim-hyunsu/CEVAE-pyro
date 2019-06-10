@@ -17,7 +17,7 @@ class Inference(object):
 
     def train(self, train_loader):
         epoch_loss = 0.
-        for x, _ in train_loader:
+        for mu1, mu0, t, x, yf, ycf in train_loader:
             if self.cuda:
                 x = x.cuda()
             epoch_loss += self.svi.step(x)
@@ -29,7 +29,7 @@ class Inference(object):
 
     def evaluate(self, test_loader):
         test_loss = 0.
-        for x, _ in test_loader:
+        for mu1, mu0, t, x, yf, ycf in test_loader:
             if self.cuda:
                 x = x.cuda()
             test_loss += self.svi.evaluate_loss(x)
