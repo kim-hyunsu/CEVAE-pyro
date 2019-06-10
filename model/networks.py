@@ -120,7 +120,7 @@ class Encoder(nn.Module):
     def forward(self, x):
 		# q(t|x)
 		t_logits = self.logits_t.forward(x)
-        t = sample('t', dist.Bernoulli(t_logtis).to_event(1))
+        t = sample('t', dist.Bernoulli(t_logits).to_event(1))
 
 		# q(y|x,t)
 		hqy = self.hqy.forward(x)
