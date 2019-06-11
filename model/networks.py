@@ -1,6 +1,9 @@
 import torch
 import torch.nn.functional as F
 from torch import nn
+from torch.autograd import Variable
+import pyro
+import pyro.distributions as dist
 
 
 class FCNet(nn.Module):
@@ -16,19 +19,19 @@ class FCNet(nn.Module):
                 self.hidden_layers.append(nn.Linear(layers[i], layers[i]))
             self.output_layers = nn.ModuleList()
             self.output_activations = []
-            for i, (outdim, self.activation) in enumerate(out_layers):
+            for i, (outdim, activation) in enumerate(out_layers):
                 self.output_layers.append(nn.Linear(layers[-1], outdim))
-                self.output_activations.append(self.activation)
+                self.output_activations.append(activation)
         else:
             self.output_layers = nn.ModuleList()
             self.output_activations = []
-            for i, (outdim, self.activation) in enumerate(out_layers):
+            for i, (outdim, activation) in enumerate(out_layers):
                 self.output_layers.append(nn.Linear(input_size, outdim))
-                self.output_activations.append(self.activation)
+                self.output_activations.append(activation)
 
     def forward(self, x):
-
-        x = self.activation(self.input(x))
+        _input = self.input(x)
+        x = self.activation(_input)
         try:
             for layer in self.hidden_layers:
                 x = self.activation(layer(x))
@@ -53,13 +56,13 @@ class Decoder(nn.Module):
 
         # p(x|z)
         self.hx = FCNet(n_z, (nh - 1) * [h], [], activation)
-        self.logits_1 = FCNet(h, [h], [[binfeats, F.sigmoid]], activation)
+        self.logits_1 = FCNet(h, [h], [[binfeats, torch.sigmoid]], activation)
 
         self.mu_sigma = FCNet(
             h, [h], [[contfeats, None], [contfeats, F.softplus]], activation)
 
         # p(t|z)
-        self.logits_2 = FCNet(n_z, [h], [[1, F.sigmoid]], activation)
+        self.logits_2 = FCNet(n_z, [h], [[1, torch.sigmoid]], activation)
 
         # p(y|t,z)
         self.mu2_t0 = FCNet(n_z, nh * [h], [[1, None]], activation)
@@ -77,7 +80,8 @@ class Decoder(nn.Module):
         # p(y|t,z)
         y_loc_t0 = self.mu2_t0(z)
         y_loc_t1 = self.mu2_t1(z)
-        y_scale = Variable(torch.ones(mu2_t0.size()))
+        y_scale = Variable(torch.ones(
+            y_loc_t0.size()).type(torch.DoubleTensor))
         if self.cuda:
             y_scale = y_scale.cuda()
 
@@ -88,7 +92,7 @@ class Decoder(nn.Module):
         mu2_t0 = self.mu2_t0(z)
         mu2_t1 = self.mu2_t1(z)
 
-        sig = Variable(torch.ones(mu2_t0.size()))
+        sig = Variable(torch.ones(mu2_t0.size()).type(torch.DoubleTensor))
         if mu2_t0.is_cuda:
             sig = sig.cuda()
 
@@ -107,7 +111,7 @@ class Encoder(nn.Module):
         in2_size = in_size + 1
 
         # q(t|x)
-        self.logits_t = FCNet(in_size, [d], [[1, F.sigmoid]], activation)
+        self.logits_t = FCNet(in_size, [d], [[1, torch.sigmoid]], activation)
 
         # q(y|x,t)
         self.hqy = FCNet(in_size, (nh - 1) * [h], [], activation)
@@ -124,22 +128,23 @@ class Encoder(nn.Module):
     def forward(self, x):
         # q(t|x)
         t_logits = self.logits_t.forward(x)
-        t = sample('t', dist.Bernoulli(t_logits).to_event(1))
+        t = pyro.sample('t', dist.Bernoulli(t_logits).to_event(1))
 
         # q(y|x,t)
         hqy = self.hqy.forward(x)
         y_loc_t0 = self.mu_qy_t0.forward(hqy)
         y_loc_t1 = self.mu_qy_t1.forward(hqy)
         y_loc = t * y_loc_t1 + (1. - t) * y_loc_t0
-        y_scale = Variable(torch.ones(y_loc_t0.size()))
+        y_scale = Variable(torch.ones(
+            y_loc_t0.size()).type(torch.DoubleTensor))
         if self.cuda:
             y_scale = y_scale.cuda()
-        y = sample('y', dist.Normal(y_loc, y_scale))
+        y = pyro.sample('y', dist.Normal(y_loc, y_scale).to_event(1))
 
         # q(z|x,t,y)
         hqz = self.hqz.forward(torch.cat((x, y), 1))
         z_loc_t0, z_scale_t0 = self.muq_t0_sigmaq_t0.forward(hqz)
-        z_loc_t1, z_scale_t0 = self.muq_t1_sigmaq_t1.forward(hqz)
+        z_loc_t1, z_scale_t1 = self.muq_t1_sigmaq_t1.forward(hqz)
         z_loc = t * z_loc_t1 + (1. - t) * z_loc_t0
         z_scale = t * z_scale_t1 + (1. - t) * z_scale_t0
 

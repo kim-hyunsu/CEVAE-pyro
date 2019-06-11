@@ -1,4 +1,7 @@
+import torch
 from torch import nn
+import pyro
+import pyro.distributions as dist
 from . import networks
 
 
@@ -20,15 +23,15 @@ class VAE(nn.Module):
     def model(self, data):
         pyro.module("decoder", self.decoder)
         x_observation = data[0]
-        binary_x_observation = data[:, :self.binary]
-        continuous_x_observation = data[:,
-                                        self.binary:self.binary+self.continuous]
+        binary_x_observation = x_observation[:, :self.binary]
+        continuous_x_observation = x_observation[:,
+                                                 self.binary:self.binary+self.continuous]
         t_observation = data[1]
         y_observation = data[2]
         with pyro.plate("data", x_observation.shape[0]):
-            z_loc = data.new_zeros(torch.Size(
+            z_loc = x_observation.new_zeros(torch.Size(
                 (x_observation.shape[0], self.z_dim)))
-            z_scale = data.new_ones(torch.Size(
+            z_scale = x_observation.new_ones(torch.Size(
                 (x_observation.shape[0], self.z_dim)))
             z = pyro.sample("latent", dist.Normal(z_loc, z_scale).to_event(1))
 
@@ -53,7 +56,7 @@ class VAE(nn.Module):
 
     def guide(self, data):
         pyro.module("encoder", self.encoder)
-        x_observation = data[0][:, :self.binary + self.continuous]
-        with pyro.plate("data", data.shape[0]):
+        x_observation = data[0]
+        with pyro.plate("data", x_observation.shape[0]):
             z_loc, z_scale = self.encoder.forward(x_observation)
             pyro.sample('latent', dist.Normal(z_loc, z_scale).to_event(1))

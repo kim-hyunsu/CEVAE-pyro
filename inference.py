@@ -9,10 +9,12 @@ class Inference(object):
         pyro.clear_param_store()
         vae = VAE(binary_features, continuous_features, z_dim,
                   hidden_dim, hidden_layers, activation, cuda)
+        vae = vae.double()
         optimizer = Adam({
             "lr": learning_rate
         })
-        self.svi = SVI(vae.model, vae.guide, optimizer, loss=Trace_ELBO())
+        self.svi = SVI(vae.model, vae.guide,
+                       optimizer, loss=Trace_ELBO())
         self.cuda = cuda
 
     def train(self, train_loader):
