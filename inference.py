@@ -21,7 +21,8 @@ class Inference(object):
         epoch_loss = 0.
         for mu1, mu0, t, x, yf, ycf in train_loader:
             if self.cuda:
-                x = x.cuda()
+                mu1, mu0, t, x, yf, ycf = mu1.cuda(), mu0.cuda(
+                ), t.cuda(), x.cuda(), yf.cuda(), ycf.cuda()
             epoch_loss += self.svi.step((x, t, yf))
 
         normalizer_train = len(train_loader.dataset)
@@ -33,7 +34,8 @@ class Inference(object):
         test_loss = 0.
         for mu1, mu0, t, x, yf, ycf in test_loader:
             if self.cuda:
-                x = x.cuda()
+                mu1, mu0, t, x, yf, ycf = mu1.cuda(), mu0.cuda(
+                ), t.cuda(), x.cuda(), yf.cuda(), ycf.cuda()
             test_loss += self.svi.evaluate_loss((x, t, yf))
 
         normalizer_test = len(test_loader.dataset)

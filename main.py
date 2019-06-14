@@ -1,5 +1,4 @@
 import argparse
-from data_loader import IHDPNPZDataset, IHDPNPZDataLoader
 from inference import Inference
 import torch
 import numpy as np
@@ -13,16 +12,25 @@ if __name__ == "__main__":
     parser.add_argument('--z-dim', type=int, default=20)
     parser.add_argument('--hidden-layers', type=int, default=3)
     parser.add_argument('--hidden-dim', type=int, default=200)
+    parser.add_argument('--data-file', choices=['npz', 'csv'], default='csv')
     args = parser.parse_args()
 
     # Data
-    path = 'data/IHDP-np'
-    test_data = IHDPNPZDataset(np.load(f'{path}/ihdp_npci_1-100.test.npz'))
-    train_data = IHDPNPZDataset(np.load(f'{path}/ihdp_npci_1-100.train.npz'))
+    if args.data_file != 'csv':
+        from data_loader import IHDPNPZDataset, IHDPNPZDataLoader
+        path = 'data/IHDP-np'
+        test_data = IHDPNPZDataset(np.load(f'{path}/ihdp_npci_1-100.test.npz'))
+        train_data = IHDPNPZDataset(
+            np.load(f'{path}/ihdp_npci_1-100.train.npz'))
+        data_loader = IHDPNPZDataLoader(test_data, train_data)
+        binary_indices, continuous_indices = train_data.indices_each_features()
 
-    data_loader = IHDPNPZDataLoader(test_data, train_data)
+    else:
+        from data_loader import IHDPDataset, IHDPDataLoader
+        dataset = IHDPDataset('data/IHDP')
+        binary_indices, continuous_indices = dataset.indices_each_features()
+        data_loader = IHDPDataLoader(dataset, validation_split=0.2)
 
-    binary_indices, continuous_indices = train_data.indices_each_features()
     train_loader, test_loader = data_loader.loaders(batch_size=args.batch_size)
 
     # CEVAE

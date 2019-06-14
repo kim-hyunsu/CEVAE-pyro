@@ -56,8 +56,10 @@ class IHDPNPZDataLoader(object):
 
 
 class IHDPDataset(torch.utils.data.Dataset):
-    def __init__(self, index):
-        data = np.loadtxt(f"{path}/ihdp_npci_{index+1}.csv", delimiter=',')
+    def __init__(self, path):
+        data = np.concatenate([np.loadtxt(
+            f"{path}/ihdp_npci_{index+1}.csv", delimiter=',') for index in range(10)], 0)
+
         self.length = data.shape[0]
         self.t = data[:, 0]
         self.yf = data[:, 1]
@@ -72,6 +74,12 @@ class IHDPDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, index):
         return self.mu1[index], self.mu0[index], self.t[index], self.x[index], self.yf[index], self.ycf[index]
+
+    def __len__(self):
+        return self.length
+
+    def indices_each_features(self):
+        return self.binary_indices, self.continuous_indices
 
 
 class IHDPDataLoader(object):
@@ -92,9 +100,13 @@ class IHDPDataLoader(object):
         train_loader = torch.utils.data.DataLoader(
             dataset=self.dataset, batch_size=batch_size, sampler=self.train_sampler)
 
+        return train_loader
+
     def test_loader(self, batch_size):
         test_loader = torch.utils.data.DataLoader(
             dataset=self.dataset, batch_size=batch_size, sampler=self.valid_sampler)
+
+        return test_loader
 
     def loaders(self, batch_size):
         train_loader = self.train_loader(batch_size)
