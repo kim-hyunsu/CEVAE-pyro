@@ -1,5 +1,6 @@
 import numpy as np
 import torch.utils.data
+from torch.utils.data.sampler import SubsetRandomSampler
 
 
 class IHDPNPZDataset(torch.utils.data.Dataset):
@@ -29,7 +30,7 @@ class IHDPNPZDataset(torch.utils.data.Dataset):
         return self.binary_indices, self.continuous_indices
 
 
-class DataLoader(object):
+class IHDPNPZDataLoader(object):
     def __init__(self, train, test, cuda=False):
         self.cuda = cuda
         self.test_set = test
@@ -46,6 +47,54 @@ class DataLoader(object):
             dataset=self.test_set, batch_size=batch_size, shuffle=False, num_workers=1, pin_memory=self.cuda)
 
         return test_loader
+
+    def loaders(self, batch_size):
+        train_loader = self.train_loader(batch_size)
+        test_loader = self.test_loader(batch_size)
+
+        return train_loader, test_loader
+
+
+class IHDPDataset(torch.utils.data.Dataset):
+    def __init__(self, index):
+        data = np.loadtxt(f"{path}/ihdp_npci_{index+1}.csv", delimiter=',')
+        self.length = data.shape[0]
+        self.t = data[:, 0]
+        self.yf = data[:, 1]
+        self.ycf = data[:, 2]
+        self.mu0 = data[:, 3]
+        self.mu1 = data[:, 4]
+        self.x = data[:, 5:]
+
+        self.x[:, 13] -= 1  # {1, 2} -> {0, 1}
+        self.binary_indices = list(range(0, 6))
+        self.continuous_indices = list(range(6, 25))
+
+    def __getitem__(self, index):
+        return self.mu1[index], self.mu0[index], self.t[index], self.x[index], self.yf[index], self.ycf[index]
+
+
+class IHDPDataLoader(object):
+    def __init__(self, dataset, validation_split, shuffle=True):
+        dataset_size = len(dataset)
+        indices = list(range(dataset_size))
+        split = int(np.floor(validation_split * dataset_size))
+        if shuffle:
+            np.random.seed(42)
+            np.random.shuffle(indices)
+        train_indices, valid_indices = indices[split:], indices[: split]
+
+        self.dataset = dataset
+        self.train_sampler = SubsetRandomSampler(train_indices)
+        self.valid_sampler = SubsetRandomSampler(valid_indices)
+
+    def train_loader(self, batch_size):
+        train_loader = torch.utils.data.DataLoader(
+            dataset=self.dataset, batch_size=batch_size, sampler=self.train_sampler)
+
+    def test_loader(self, batch_size):
+        test_loader = torch.utils.data.DataLoader(
+            dataset=self.dataset, batch_size=batch_size, sampler=self.valid_sampler)
 
     def loaders(self, batch_size):
         train_loader = self.train_loader(batch_size)
