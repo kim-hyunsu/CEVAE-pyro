@@ -1,18 +1,14 @@
 import pyro
-from pyro.optim import Adam
 from pyro.infer import SVI, Trace_ELBO
 from model.vae import VAE
 
 
 class Inference(object):
-    def __init__(self, binary_features, continuous_features, z_dim, hidden_dim, hidden_layers, learning_rate, activation, cuda):
+    def __init__(self, binary_features, continuous_features, z_dim, hidden_dim, hidden_layers, optimizer, activation, cuda):
         pyro.clear_param_store()
         vae = VAE(binary_features, continuous_features, z_dim,
                   hidden_dim, hidden_layers, activation, cuda)
         vae = vae.double()
-        optimizer = Adam({
-            "lr": learning_rate
-        })
         self.svi = SVI(vae.model, vae.guide,
                        optimizer, loss=Trace_ELBO())
         self.cuda = cuda
