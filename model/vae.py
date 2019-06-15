@@ -2,15 +2,15 @@ import torch
 from torch import nn
 import pyro
 import pyro.distributions as dist
-from . import networks
+from networks import Encoder, Decoder
 
 
 class VAE(nn.Module):
     def __init__(self, binary_features, continuous_features, z_dim, hidden_dim, hidden_layers, activation, cuda):
         super(VAE, self).__init__()
-        self.encoder = networks.Encoder(
+        self.encoder = Encoder(
             binary_features, continuous_features, z_dim, hidden_dim, hidden_layers, activation, cuda)
-        self.decoder = networks.Decoder(
+        self.decoder = Decoder(
             binary_features, continuous_features, z_dim, hidden_dim, hidden_layers, activation, cuda)
 
         if cuda:
@@ -60,3 +60,22 @@ class VAE(nn.Module):
         with pyro.plate("data", x_observation.shape[0]):
             z_loc, z_scale = self.encoder.forward(x_observation)
             pyro.sample('latent', dist.Normal(z_loc, z_scale).to_event(1))
+
+    def predict_y(self, x, L=1):
+        assert(L >= 1)
+        z_loc_t0, z_loc_t1 = self.encoder.forward_z(x)
+
+        y_loc_t0, y_scale_t0 = self.decoder.forward_y(z_loc_t0, False)
+        y0 = dist.Normal(y_loc_t0, y_scale_t0).sample()
+
+        y_loc_t1, y_scale_t1 = self.decoder.forward_y(z_loc_t1, True)
+        y1 = dist.Normal(y_loc_t1, y_scale_t1).sample()
+
+        for _ in range(L):
+            y_loc_t0, y_scale_t0 = self.decoder.forward_y(z_loc_t0, False)
+            y0 += dist.Normal(y_loc_t0, y_scale_t0).sample()
+
+            y_loc_t1, y_scale_t1 = self.decoder.forward_y(z_loc_t1, True)
+            y1 += dist.Normal(y_loc_t1, y_scale_t1).sample()
+
+        return y0, y1

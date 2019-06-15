@@ -87,20 +87,19 @@ class Decoder(nn.Module):
 
         return (x_logits, x_loc, x_scale), (t_logits), (y_loc_t0, y_loc_t1, y_scale)
 
-    def P_y_zt(self, z, t):
-        # p(y|t,z)
-        mu2_t0 = self.mu2_t0(z)
-        mu2_t1 = self.mu2_t1(z)
+    def forward_y(self, z, treated):
+        # p(y|t=1,z) or p(y|t=0,z)
+        y_loc_t0 = self.mu2_t0(z)
+        y_loc_t1 = self.mu2_t1(z)
+        y_scale = Variable(torch.ones(
+            y_loc_t0.size()).type(torch.DoubleTensor))
+        if self.cuda:
+            y_scale = y_scale.cuda()
 
-        sig = Variable(torch.ones(mu2_t0.size()).type(torch.DoubleTensor))
-        if mu2_t0.is_cuda:
-            sig = sig.cuda()
-
-        if t:
-            y = dist.normal(mu2_t1, sig)
+        if treated:
+            return y_loc_t1, y_scale
         else:
-            y = dist.normal(mu2_t0, sig)
-        return y
+            return y_loc_t0, y_scale
 
 
 class Encoder(nn.Module):
@@ -149,3 +148,26 @@ class Encoder(nn.Module):
         z_scale = t * z_scale_t1 + (1. - t) * z_scale_t0
 
         return z_loc, z_scale
+
+    def forward_z(self, x):
+        # q(t|x)
+        t_logits = self.logits_t.forward(x)
+        t = pyro.sample('t', dist.Bernoulli(t_logits).to_event(1))
+
+        # q(y|x,t)
+        hqy = self.hqy.forward(x)
+        y_loc_t0 = self.mu_qy_t0.forward(hqy)
+        y_loc_t1 = self.mu_qy_t1.forward(hqy)
+        y_loc = t * y_loc_t1 + (1. - t) * y_loc_t0
+        y_scale = Variable(torch.ones(
+            y_loc_t0.size()).type(torch.DoubleTensor))
+        if self.cuda:
+            y_scale = y_scale.cuda()
+        y = pyro.sample('y', dist.Normal(y_loc, y_scale).to_event(1))
+
+        # q(z|x,t,y)
+        hqz = self.hqz.forward(torch.cat((x, y), 1))
+        z_loc_t0, z_scale_t0 = self.muq_t0_sigmaq_t0.forward(hqz)
+        z_loc_t1, z_scale_t1 = self.muq_t1_sigmaq_t1.forward(hqz)
+
+        return z_loc_t0, z_loc_t1
