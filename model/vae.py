@@ -66,16 +66,16 @@ class VAE(nn.Module):
         z_loc_t0, z_loc_t1 = self.encoder.forward_z(x)
 
         y_loc_t0, y_scale_t0 = self.decoder.forward_y(z_loc_t0, False)
-        y0 = dist.Normal(y_loc_t0, y_scale_t0).sample()
+        y0 = dist.Normal(y_loc_t0, y_scale_t0).sample() / L
 
         y_loc_t1, y_scale_t1 = self.decoder.forward_y(z_loc_t1, True)
-        y1 = dist.Normal(y_loc_t1, y_scale_t1).sample()
+        y1 = dist.Normal(y_loc_t1, y_scale_t1).sample() / L
 
-        for _ in range(L):
+        for _ in range(L - 1):
             y_loc_t0, y_scale_t0 = self.decoder.forward_y(z_loc_t0, False)
-            y0 += dist.Normal(y_loc_t0, y_scale_t0).sample()
+            y0 += dist.Normal(y_loc_t0, y_scale_t0).sample() / L
 
             y_loc_t1, y_scale_t1 = self.decoder.forward_y(z_loc_t1, True)
-            y1 += dist.Normal(y_loc_t1, y_scale_t1).sample()
+            y1 += dist.Normal(y_loc_t1, y_scale_t1).sample() / L
 
         return y0, y1

@@ -63,6 +63,11 @@ class IHDPDataset(torch.utils.data.Dataset):
         self.length = data.shape[0]
         self.t = data[:, 0]
         self.yf = data[:, 1]
+
+        # Zero mean, unit variance for y during training
+        self.y_mean, self.y_std = np.mean(self.yf), np.std(self.yf)
+        self.yf = (self.yf - y_mean) / y_std
+
         self.ycf = data[:, 2]
         self.mu0 = data[:, 3]
         self.mu1 = data[:, 4]
@@ -80,6 +85,9 @@ class IHDPDataset(torch.utils.data.Dataset):
 
     def indices_each_features(self):
         return self.binary_indices, self.continuous_indices
+
+    def y_mean_std(self):
+        return self.y_mean, self.y_std
 
 
 class IHDPDataLoader(object):

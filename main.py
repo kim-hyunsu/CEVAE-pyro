@@ -19,6 +19,7 @@ if __name__ == "__main__":
 
     # Data
     dataset = IHDPDataset('data/IHDP')
+    y_mean, y_std = dataset.y_mean_std()
     binary_indices, continuous_indices = dataset.indices_each_features()
     data_loader = IHDPDataLoader(dataset, validation_split=0.1)
 
@@ -31,7 +32,7 @@ if __name__ == "__main__":
         "lr": args.learning_rate, "weight_decay": args.weight_decay
     })
     activation = torch.nn.functional.elu
-    inference = Inference(len(binary_indices), len(continuous_indices), args.z_dim,
+    inference = Inference(y_mean, y_std, len(binary_indices), len(continuous_indices), args.z_dim,
                           args.hidden_dim, args.hidden_layers, optimizer, activation, cuda)
 
     # Training
