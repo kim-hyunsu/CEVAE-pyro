@@ -2,7 +2,7 @@ import torch
 from torch import nn
 import pyro
 import pyro.distributions as dist
-from networks import Encoder, Decoder
+from .networks import Encoder, Decoder
 
 
 class VAE(nn.Module):
