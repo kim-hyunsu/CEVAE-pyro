@@ -56,9 +56,7 @@ class IHDPNPZDataLoader(object):
 
 
 class IHDPDataset(torch.utils.data.Dataset):
-    def __init__(self, path):
-        data = np.concatenate([np.loadtxt(
-            f"{path}/ihdp_npci_{index+1}.csv", delimiter=',') for index in range(10)], 0)
+    def __init__(self, data):
 
         self.length = data.shape[0]
         self.t = data[:, 0]
@@ -66,7 +64,7 @@ class IHDPDataset(torch.utils.data.Dataset):
 
         # Zero mean, unit variance for y during training
         self.y_mean, self.y_std = np.mean(self.yf), np.std(self.yf)
-        self.yf = (self.yf - y_mean) / y_std
+        self.standard_yf = (self.yf - self.y_mean) / self.y_std
 
         self.ycf = data[:, 2]
         self.mu0 = data[:, 3]
@@ -78,7 +76,7 @@ class IHDPDataset(torch.utils.data.Dataset):
         self.continuous_indices = list(range(6, 25))
 
     def __getitem__(self, index):
-        return self.mu1[index], self.mu0[index], self.t[index], self.x[index], self.yf[index], self.ycf[index]
+        return self.mu1[index], self.mu0[index], self.t[index], self.x[index], self.yf[index], self.ycf[index], self.standard_yf[index]
 
     def __len__(self):
         return self.length

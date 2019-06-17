@@ -18,7 +18,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Data
-    dataset = IHDPDataset('data/IHDP')
+    path = 'data/IHDP'
+    data = np.concatenate([np.loadtxt(
+        f"{path}/ihdp_npci_{index+1}.csv", delimiter=',') for index in range(10)], 0)
+    dataset = IHDPDataset(data)
     y_mean, y_std = dataset.y_mean_std()
     binary_indices, continuous_indices = dataset.indices_each_features()
     data_loader = IHDPDataLoader(dataset, validation_split=0.1)
@@ -48,3 +51,7 @@ if __name__ == "__main__":
             test_elbo.append(-total_epoch_loss_test)
             print(
                 f"[epoch {epoch:03d}] average test loss: {total_epoch_loss_test:.4f}")
+
+            (ITE, ATE, PEHE), (RMSE_factual,
+                               RMSE_counterfactual) = inference.train_statistics(L=1)
+            print(f"[epoch {epoch:03d}] ITE: {ITE:0.3f}, ATE: {ATE:0.3f}, PEHE: {PEHE:0.3f}, Factual RMSE: {RMSE_factual:0.3f}, Counterfactual RMSE: {RMSE_counterfactual:0.3f}")
