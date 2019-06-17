@@ -64,6 +64,7 @@ class Inference(object):
 
     def _predict(self, x, L):
         y0, y1 = self.vae.predict_y(x, L)
+
         return self.y_mean + y0 * self.y_std, self.y_mean + y1 * self.y_std
 
     def train_statistics(self, L):
@@ -74,4 +75,8 @@ class Inference(object):
         return (ITE, ATE, PEHE), (RMSE_factual, RMSE_counterfactual)
 
     def test_statistics(self, L):
-        pass
+        y0, y1 = self._predict(self.test_stats.data['x'], L)
+        ITE, ATE, PEHE = self.test_stats.calculate(y0, y1)
+        RMSE_factual, RMSE_counterfactual = self.test_stats.y_errors(y0, y1)
+
+        return (ITE, ATE, PEHE), (RMSE_factual, RMSE_counterfactual)

@@ -72,8 +72,8 @@ class IHDPDataset(torch.utils.data.Dataset):
         self.x = data[:, 5:]
 
         self.x[:, 13] -= 1  # {1, 2} -> {0, 1}
-        self.binary_indices = list(range(0, 6))
-        self.continuous_indices = list(range(6, 25))
+        self.binary_indices = list(range(6, 25))
+        self.continuous_indices = list(range(0, 6))
 
     def __getitem__(self, index):
         return self.mu1[index], self.mu0[index], self.t[index], self.x[index], self.yf[index], self.ycf[index], self.standard_yf[index]

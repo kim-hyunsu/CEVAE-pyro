@@ -18,7 +18,6 @@ class Statistics(object):
         predicted_ITE = torch.where(
             self.data['t'] == 1, self.data['yf'] - y0, y1 - self.data['yf'])
         error = self.true_ITE - predicted_ITE
-
         return torch.sqrt(torch.mean(torch.mul(error, error)))
 
     def _absolute_ATE(self, y0, y1):
@@ -28,6 +27,7 @@ class Statistics(object):
         return torch.sqrt(torch.mean(self.true_ITE - (y1 - y0)))
 
     def y_errors(self, y0, y1):
+        y0, y1 = y0.contiguous().view(1, -1)[0], y1.contiguous().view(1, -1)[0]
         factual_y = (1. - self.data['t']) * y0 + self.data['t'] * y1
         counterfactual_y = self.data['t'] * y0 + (1. - self.data['t']) * y1
 
@@ -42,8 +42,8 @@ class Statistics(object):
         return RMSE_factual, RMSE_counterfactual
 
     def calculate(self, y0, y1):
+        y0, y1 = y0.contiguous().view(1, -1)[0], y1.contiguous().view(1, -1)[0]
         ITE = self._RMSE_ITE(y0, y1)
         ATE = self._absolute_ATE(y0, y1)
         PEHE = self._PEHE(y0, y1)
-
         return ITE, ATE, PEHE

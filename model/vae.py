@@ -23,9 +23,9 @@ class VAE(nn.Module):
     def model(self, data):
         pyro.module("decoder", self.decoder)
         x_observation = data[0]
-        binary_x_observation = x_observation[:, :self.binary]
-        continuous_x_observation = x_observation[:,
-                                                 self.binary:self.binary+self.continuous]
+        continuous_x_observation = x_observation[:, :self.continuous]
+        binary_x_observation = x_observation[:,
+                                             self.continuous:]
         t_observation = data[1]
         y_observation = data[2]
         with pyro.plate("data", x_observation.shape[0]):
