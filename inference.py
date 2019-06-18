@@ -7,7 +7,7 @@ from statistics import Statistics
 
 class Inference(object):
     def __init__(self,
-                 y_mean, y_std, binary_features, continuous_features,
+                 binary_features, continuous_features,
                  z_dim, hidden_dim, hidden_layers, optimizer, activation,
                  cuda):
         pyro.clear_param_store()
@@ -18,8 +18,6 @@ class Inference(object):
         self.svi = SVI(vae.model, vae.guide,
                        optimizer, loss=Trace_ELBO())
         self.cuda = cuda
-        self.y_mean = y_mean
-        self.y_std = y_std
 
         self.train_stats = Statistics()
         self.test_stats = Statistics()
@@ -62,21 +60,41 @@ class Inference(object):
 
         return total_epoch_loss_test
 
-    def _predict(self, x, L):
+    def _predict(self, x, y_mean, y_std, L):
         y0, y1 = self.vae.predict_y(x, L)
 
-        return self.y_mean + y0 * self.y_std, self.y_mean + y1 * self.y_std
+        return y_mean + y0 * y_std, y_mean + y1 * y_std
 
-    def train_statistics(self, L):
-        y0, y1 = self._predict(self.train_stats.data['x'], L)
+    def train_statistics(self, L, y_error=False):
+        y_mean_train = torch.mean(self.train_stats.data['yf'])
+        y_std_train = torch.mean(self.train_stats.data['yf'])
+
+        y0, y1 = self._predict(
+            self.train_stats.data['x'], y_mean_train, y_std_train, L)
+
         ITE, ATE, PEHE = self.train_stats.calculate(y0, y1)
-        RMSE_factual, RMSE_counterfactual = self.train_stats.y_errors(y0, y1)
+        if y_error:
+            RMSE_factual, RMSE_counterfactual = self.train_stats.y_errors(
+                y0, y1)
+            return (ITE, ATE, PEHE), (RMSE_factual, RMSE_counterfactual)
 
-        return (ITE, ATE, PEHE), (RMSE_factual, RMSE_counterfactual)
+        return ITE, ATE, PEHE
 
-    def test_statistics(self, L):
-        y0, y1 = self._predict(self.test_stats.data['x'], L)
+    def test_statistics(self, L, y_error=False):
+        y_mean_test = torch.mean(self.test_stats.data['yf'])
+        y_std_test = torch.mean(self.test_stats.data['yf'])
+
+        y0, y1 = self._predict(
+            self.test_stats.data['x'], y_mean_test, y_std_test, L)
+
         ITE, ATE, PEHE = self.test_stats.calculate(y0, y1)
-        RMSE_factual, RMSE_counterfactual = self.test_stats.y_errors(y0, y1)
+        if y_error:
+            RMSE_factual, RMSE_counterfactual = self.test_stats.y_errors(
+                y0, y1)
+            return (ITE, ATE, PEHE), (RMSE_factual, RMSE_counterfactual)
 
-        return (ITE, ATE, PEHE), (RMSE_factual, RMSE_counterfactual)
+        return ITE, ATE, PEHE
+
+    def initialize_statistics(self):
+        self.train_stats = Statistics()
+        self.test_stats = Statistics()

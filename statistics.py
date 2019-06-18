@@ -24,7 +24,8 @@ class Statistics(object):
         return torch.abs(torch.mean(y1 - y0) - torch.mean(self.true_ITE))
 
     def _PEHE(self, y0, y1):
-        return torch.sqrt(torch.mean(self.true_ITE - (y1 - y0)))
+        error = self.true_ITE - (y1 - y0)
+        return torch.sqrt(torch.mean(torch.mul(error, error)))
 
     def y_errors(self, y0, y1):
         y0, y1 = y0.contiguous().view(1, -1)[0], y1.contiguous().view(1, -1)[0]
