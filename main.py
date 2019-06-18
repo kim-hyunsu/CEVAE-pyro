@@ -4,6 +4,7 @@ from inference import Inference
 import torch
 from pyro.optim import Adam
 import numpy as np
+import os
 
 if __name__ == "__main__":
     # Command line
@@ -18,10 +19,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Data
-    path = 'data/IHDP'
+    path = os.path.dirname(os.path.abspath(__file__))
     data_loaders = []
     for i in range(10):
-        data = np.loadtxt(f"{path}/ihdp_npci_{i+1}.csv", delimiter=',')
+        data = np.loadtxt(
+            f"{path}/data/IHDP/ihdp_npci_{i+1}.csv", delimiter=',')
         dataset = IHDPDataset(data)
         binary_indices, continuous_indices = dataset.indices_each_features()
         data_loader = IHDPDataLoader(dataset, validation_split=0.2)
@@ -57,11 +59,11 @@ if __name__ == "__main__":
 
                 (ITE, ATE, PEHE), (RMSE_factual,
                                    RMSE_counterfactual) = inference.train_statistics(L=1, y_error=True)
-                # print(f"[epoch {epoch:03d}] #TRAIN# ITE: {ITE:0.3f}, ATE: {ATE:0.3f}, PEHE: {PEHE:0.3f}, Factual RMSE: {RMSE_factual:0.3f}, Counterfactual RMSE: {RMSE_counterfactual:0.3f}")
+                print(f"[epoch {epoch:03d}] #TRAIN# ITE: {ITE:0.3f}, ATE: {ATE:0.3f}, PEHE: {PEHE:0.3f}, Factual RMSE: {RMSE_factual:0.3f}, Counterfactual RMSE: {RMSE_counterfactual:0.3f}")
 
                 ITE_test, ATE_test, PEHE_test = inference.test_statistics(L=1)
-                # print(
-                #     f"[epoch {epoch:03d}] #TEST# ITE: {ITE_test:0.3f}, ATE: {ATE_test:0.3f}, PEHE: {PEHE_test:0.3f}")
+                print(
+                    f"[epoch {epoch:03d}] #TEST# ITE: {ITE_test:0.3f}, ATE: {ATE_test:0.3f}, PEHE: {PEHE_test:0.3f}")
 
         score = inference.train_statistics(L=100)
         print(
