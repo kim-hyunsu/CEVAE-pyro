@@ -26,7 +26,7 @@ class Inference(object):
         epoch_loss = 0.
         for mu1, mu0, t, x, yf, ycf, std_yf in train_loader:
             if self.cuda:
-                mu1, mu0, t, x, yf, ycf = mu1.cuda(), mu0.cuda(
+                mu1, mu0, t, x, yf, ycf, std_yf = mu1.cuda(), mu0.cuda(
                 ), t.cuda(), x.cuda(), yf.cuda(), ycf.cuda(), std_yf.cuda()
             epoch_loss += self.svi.step((x, t, std_yf))
             self.train_stats.collect('mu1', mu1)
@@ -45,7 +45,7 @@ class Inference(object):
         test_loss = 0.
         for mu1, mu0, t, x, yf, ycf, std_yf in test_loader:
             if self.cuda:
-                mu1, mu0, t, x, yf, ycf = mu1.cuda(), mu0.cuda(
+                mu1, mu0, t, x, yf, ycf, std_yf = mu1.cuda(), mu0.cuda(
                 ), t.cuda(), x.cuda(), yf.cuda(), ycf.cuda(), std_yf.cuda()
             test_loss += self.svi.evaluate_loss((x, t, std_yf))
             self.test_stats.collect('mu1', mu1)
